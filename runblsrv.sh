@@ -82,10 +82,14 @@ install_deps() {
 			echo "WineHQ repository already enabled."
 		fi
 		;;
+
+	*)
+		echo "Unknown distro $ID version $VERSION"
+		;;
 	esac
 
 	# install required packages
-	declare -a packagesinst
+	packagesinst=()
 	case "$ID" in
 	arch)
 		packages=("screen" "unzip" "wine" "xorg-server-xvfb")
@@ -129,6 +133,10 @@ install_deps() {
 		else
 			echo "Required packages already installed."
 		fi
+		;;
+
+	*)
+		echo "Unknown distro $ID version $VERSION"
 		;;
 	esac
 
