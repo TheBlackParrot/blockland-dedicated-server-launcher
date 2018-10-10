@@ -5,8 +5,9 @@ ATTACH=false
 GAMEMODE="Custom"
 export WINEDLLOVERRIDES="mscoree=d;mshtml=d;$WINEDLLOVERRIDES"
 DEDICATED_MODE="-dedicated"
-BLOCKLAND_FILES_FILENAME="BLr1988-server.zip"
-BLOCKLAND_FILES_URL="https://birb.zone/files/$BLOCKLAND_FILES_FILENAME"
+
+BLOCKLAND_FILES_DL_FILENAME="BLr1988-server.zip"
+BLOCKLAND_FILES_DL_URL="https://birb.zone/files/$BLOCKLAND_FILES_DL_FILENAME"
 
 if [ $(id -u) == 0 ]; then
 	echo "This script cannot be run as root"
@@ -125,32 +126,34 @@ install_deps() {
 	esac
 
 	# download Blockland itself
-	if [ ! -e $BLOCKLAND_FILES_FILENAME ]; then
+	if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
 		echo ""
 		read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
 
 		if which wget; then
 			echo "wget is reachable, using it"
-			wget $BLOCKLAND_FILES_URL
+			wget $BLOCKLAND_FILES_DL_URL
 		else
 			echo "wget isn't reachable, attempting curl"
-			curl -o $BLOCKLAND_FILES_FILENAME $BLOCKLAND_FILES_URL
+			curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
 		fi
 
-		if [ ! -e $BLOCKLAND_FILES_FILENAME ]; then
+		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
 			echo "Failed to download server files, aborting."
 			exit 1
 		fi
 	fi
-	unzip $BLOCKLAND_FILES_FILENAME
+	unzip $BLOCKLAND_FILES_DL_FILENAME
 
 	echo "Installation complete! Navigate to $INSTALL_DIR and use './runblsrv.sh -g Freebuild' to run a Freebuild server!"
 	exit 0
 }
 
 OPTIND=1
-while getopts "i:g:an:lzh" opt; do
+while getopts "f:i:g:an:lzh" opt; do
 	case "$opt" in
+	f)	USE_FILE_FOR_BL_DATA="$OPTARG"
+		;;
 	i)	install_deps "$OPTARG"
 		exit 1
 		;;
@@ -166,7 +169,7 @@ while getopts "i:g:an:lzh" opt; do
 		ATTACH=false
 		;;
 	h|?) echo "Blockland Dedicated Server Script"
-		echo "version 1.2.1 -- October 10th, 2018 01:12 CDT"
+		echo "version 1.2.2 -- October 10th, 2018 01:12 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo ""
 		echo "Usage: ./runblsrv.sh [options]"
@@ -177,6 +180,7 @@ while getopts "i:g:an:lzh" opt; do
 		echo "          -l            Run a LAN server                           [default false]"
 		echo "          -z            Don't attach to a seperate session         [default false]"
 		echo "          -i [dir]      Install dependencies"
+		echo "          -f [file]     Override downloading game data and use a local file"
 		exit 1
 		;;
 	esac
