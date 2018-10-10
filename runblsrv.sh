@@ -6,6 +6,8 @@ GAMEMODE="Custom"
 export WINEDLLOVERRIDES="mscoree=d;mshtml=d;$WINEDLLOVERRIDES"
 DEDICATED_MODE="-dedicated"
 
+INSTALLING=false
+
 BLOCKLAND_FILES_DL_FILENAME="BLr1988-server.zip"
 BLOCKLAND_FILES_DL_URL="https://birb.zone/files/$BLOCKLAND_FILES_DL_FILENAME"
 
@@ -172,10 +174,9 @@ install_deps() {
 OPTIND=1
 while getopts "f:i:g:an:lzh" opt; do
 	case "$opt" in
-	f)	USE_FILE_FOR_BL_DATA="$OPTARG"
+	f)	USE_FILE_FOR_BL_DATA="realpath $OPTARG"
 		;;
-	i)	install_deps "$OPTARG"
-		exit 1
+	i)	INSTALLING=true
 		;;
 	a)	ATTACH=true
 		;;
@@ -194,17 +195,25 @@ while getopts "f:i:g:an:lzh" opt; do
 		echo ""
 		echo "Usage: ./runblsrv.sh [options]"
 		echo ""
-		echo "Options:  -a            Automatically attach to the session        [default false]"
-		echo "          -g [gamemode] Specify a gamemode"
-		echo "          -n [name]     Set a custom name for the screen session"
-		echo "          -l            Run a LAN server                           [default false]"
-		echo "          -z            Don't attach to a seperate session         [default false]"
-		echo "          -i [dir]      Install dependencies"
-		echo "          -f [file]     Override downloading game data and use a local file"
+		echo "Launcher Options:"
+		echo "    -a             Automatically attach to the session        [default false]"
+		echo "    -g [gamemode]  Specify a gamemode"
+		echo "    -n [name]      Set a custom name for the screen session"
+		echo "    -l             Run a LAN server                           [default false]"
+		echo "    -z             Don't attach to a seperate session         [default false]"
+		echo "Installation Options:"
+		echo "    -i [dir]      Install dependencies"
+		echo "    -f [file]     Override downloading game data and use a local file instead"
 		exit 1
 		;;
 	esac
 done
+
+if $INSTALLING; then
+	install_deps "$OPTARG"
+	exit 1
+fi
+
 shift $((OPTIND-1))
 [ "$1" = "--" ] && shift
 
