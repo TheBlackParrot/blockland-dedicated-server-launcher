@@ -174,7 +174,7 @@ install_deps() {
 OPTIND=1
 while getopts "f:i:g:an:lzh" opt; do
 	case "$opt" in
-	f)	USE_FILE_FOR_BL_DATA="realpath $OPTARG"
+	f)	USE_FILE_FOR_BL_DATA=$(realpath "$OPTARG")
 		;;
 	i)	INSTALLING=true
 		;;
