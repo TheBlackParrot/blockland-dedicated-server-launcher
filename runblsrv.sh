@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 NO_SCREEN=false
 ATTACH=false
