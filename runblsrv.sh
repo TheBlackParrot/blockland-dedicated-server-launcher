@@ -9,7 +9,7 @@ DEDICATED_MODE="-dedicated"
 BLOCKLAND_FILES_DL_FILENAME="BLr1988-server.zip"
 BLOCKLAND_FILES_DL_URL="https://birb.zone/files/$BLOCKLAND_FILES_DL_FILENAME"
 
-if [ $(id -u) == 0 ]; then
+if [ $(id -u) -eq 0 ]; then
 	echo "This script cannot be run as root"
 	exit 1
 fi
@@ -47,6 +47,13 @@ install_deps() {
 		fi
 	fi
 
+	if [ ! -z "$USE_FILE_FOR_BL_DATA" ]; then
+		if [ ! -e "$USE_FILE_FOR_BL_DATA" ]; then
+			echo "Cannot access $USE_FILE_FOR_BL_DATA, please check permissions and/or if the file exists."
+			exit 1
+		fi
+	fi
+
 	cp "$0" "$INSTALL_DIR"
 	cd "$INSTALL_DIR"
 	chmod +x "$0"
@@ -78,7 +85,7 @@ install_deps() {
 	esac
 
 	# install required packages
-	packagesinst=()
+	declare -a packagesinst
 	case "$ID" in
 	arch)
 		packages=("screen" "unzip" "wine" "xorg-server-xvfb")
@@ -126,24 +133,29 @@ install_deps() {
 	esac
 
 	# download Blockland itself
-	if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
-		echo ""
-		read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
-
-		if which wget; then
-			echo "wget is reachable, using it"
-			wget $BLOCKLAND_FILES_DL_URL
-		else
-			echo "wget isn't reachable, attempting curl"
-			curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
-		fi
-
+	if [ -z "$USE_FILE_FOR_BL_DATA" ]; then
+		echo "not using an overriding local file"
 		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
-			echo "Failed to download server files, aborting."
-			exit 1
+			echo ""
+			read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
+
+			if which wget; then
+				echo "wget is reachable, using it"
+				wget $BLOCKLAND_FILES_DL_URL
+			else
+				echo "wget isn't reachable, attempting curl"
+				curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
+			fi
+
+			if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
+				echo "Failed to download server files, aborting."
+				exit 1
+			fi
 		fi
+		unzip $BLOCKLAND_FILES_DL_FILENAME
+	else
+		unzip "$USE_FILE_FOR_BL_DATA" -d $INSTALL_DIR
 	fi
-	unzip $BLOCKLAND_FILES_DL_FILENAME
 
 	echo "Installation complete! Navigate to $INSTALL_DIR and use './runblsrv.sh -g Freebuild' to run a Freebuild server!"
 	exit 0
