@@ -177,6 +177,7 @@ while getopts "f:i:g:an:lzh" opt; do
 	f)	USE_FILE_FOR_BL_DATA=$(realpath "$OPTARG")
 		;;
 	i)	INSTALLING=true
+		INSTALL_TO=$(realpath "$OPTARG")
 		;;
 	a)	ATTACH=true
 		;;
@@ -210,7 +211,7 @@ while getopts "f:i:g:an:lzh" opt; do
 done
 
 if $INSTALLING; then
-	install_deps "$OPTARG"
+	install_deps "$INSTALL_TO"
 	exit 1
 fi
 
