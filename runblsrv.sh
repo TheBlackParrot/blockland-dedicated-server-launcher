@@ -85,6 +85,32 @@ install_deps() {
 		fi
 		;;
 
+	ubuntu)
+		echo ""
+		case "$VERSION_ID" in
+		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
+			if grep "^deb https://dl.winehq.org/wine-builds/ubuntu" /etc/apt/sources.list; then
+				echo "WineHQ repository already enabled"
+			else
+				read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+
+				sudo dpkg --add-architecture i386
+
+				curl -o /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				sudo apt-key add /tmp/Release.key
+				rm /tmp/Release.key
+
+				sudo apt-add-repository https://dl.winehq.org/wine-builds/ubuntu/
+			fi
+			sudo apt-get update
+			;;
+
+		*)
+			echo "This version of Ubuntu is not supported."
+			;;
+		esac
+		;;
+
 	*)
 		echo "Unknown distro $ID version $VERSION"
 		;;
@@ -135,6 +161,37 @@ install_deps() {
 		else
 			echo "Required packages already installed."
 		fi
+		;;
+
+	ubuntu)
+		case "$VERSION_ID" in
+		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
+			packages=("screen" "unzip" "winehq-devel" "xvfb")
+			for package in ${packages[@]}; do
+				echo "checking for installation of $package..."
+				if dpkg -l $package > /dev/null; then
+					echo "already installed $package !"
+				else
+					echo "need to install $package !"
+					packagesinst+=("$package")
+				fi
+			done
+
+			if [ ${#packagesinst[@]} -gt 0 ]; then
+				echo ""
+				echo "The following packages and their dependencies will be installed: (press any key to continue)"
+				echo "${packagesinst[@]}"
+				read -n 1 -s -r -p ""
+				sudo apt-get -y install ${packagesinst[@]}
+			else
+				echo "Required packages already installed."
+			fi
+			;;
+
+		*)
+			echo "This version of Ubuntu is not supported."
+			;;
+		esac
 		;;
 
 	*)
