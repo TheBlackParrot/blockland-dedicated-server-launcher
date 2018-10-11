@@ -1,14 +1,17 @@
-#!/bin/sh
+#!/bin/bash
 
 NO_SCREEN=false
 ATTACH=false
 GAMEMODE="Custom"
 export WINEDLLOVERRIDES="mscoree=d;mshtml=d;$WINEDLLOVERRIDES"
 DEDICATED_MODE="-dedicated"
-BLOCKLAND_FILES_FILENAME="BLr1988-server.zip"
-BLOCKLAND_FILES_URL="https://birb.zone/files/$BLOCKLAND_FILES_FILENAME"
 
-if [ $(id -u) == 0 ]; then
+INSTALLING=false
+
+BLOCKLAND_FILES_DL_FILENAME="BLr1988-server.zip"
+BLOCKLAND_FILES_DL_URL="https://birb.zone/files/$BLOCKLAND_FILES_DL_FILENAME"
+
+if [ $(id -u) -eq 0 ]; then
 	echo "This script cannot be run as root"
 	exit 1
 fi
@@ -46,6 +49,13 @@ install_deps() {
 		fi
 	fi
 
+	if [ ! -z "$USE_FILE_FOR_BL_DATA" ]; then
+		if [ ! -e "$USE_FILE_FOR_BL_DATA" ]; then
+			echo "Cannot access $USE_FILE_FOR_BL_DATA, please check permissions and/or if the file exists."
+			exit 1
+		fi
+	fi
+
 	cp "$0" "$INSTALL_DIR"
 	cd "$INSTALL_DIR"
 	chmod +x "$0"
@@ -73,6 +83,36 @@ install_deps() {
 		else
 			echo "WineHQ repository already enabled."
 		fi
+		;;
+
+	ubuntu)
+		echo ""
+		case "$VERSION_ID" in
+		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
+			if grep "^deb https://dl.winehq.org/wine-builds/ubuntu" /etc/apt/sources.list; then
+				echo "WineHQ repository already enabled"
+			else
+				read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+
+				sudo dpkg --add-architecture i386
+
+				curl -o /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				sudo apt-key add /tmp/Release.key
+				rm /tmp/Release.key
+
+				sudo apt-add-repository https://dl.winehq.org/wine-builds/ubuntu/
+			fi
+			sudo apt-get update
+			;;
+
+		*)
+			echo "This version of Ubuntu is not supported."
+			;;
+		esac
+		;;
+
+	*)
+		echo "Unknown distro $ID version $VERSION"
 		;;
 	esac
 
@@ -122,37 +162,79 @@ install_deps() {
 			echo "Required packages already installed."
 		fi
 		;;
+
+	ubuntu)
+		case "$VERSION_ID" in
+		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
+			packages=("screen" "unzip" "winehq-devel" "xvfb")
+			for package in ${packages[@]}; do
+				echo "checking for installation of $package..."
+				if dpkg -l $package > /dev/null; then
+					echo "already installed $package !"
+				else
+					echo "need to install $package !"
+					packagesinst+=("$package")
+				fi
+			done
+
+			if [ ${#packagesinst[@]} -gt 0 ]; then
+				echo ""
+				echo "The following packages and their dependencies will be installed: (press any key to continue)"
+				echo "${packagesinst[@]}"
+				read -n 1 -s -r -p ""
+				sudo apt-get -y install ${packagesinst[@]}
+			else
+				echo "Required packages already installed."
+			fi
+			;;
+
+		*)
+			echo "This version of Ubuntu is not supported."
+			;;
+		esac
+		;;
+
+	*)
+		echo "Unknown distro $ID version $VERSION"
+		;;
 	esac
 
 	# download Blockland itself
-	if [ ! -e $BLOCKLAND_FILES_FILENAME ]; then
-		echo ""
-		read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
+	if [ -z "$USE_FILE_FOR_BL_DATA" ]; then
+		echo "not using an overriding local file"
+		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
+			echo ""
+			read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
 
-		if which wget; then
-			echo "wget is reachable, using it"
-			wget $BLOCKLAND_FILES_URL
-		else
-			echo "wget isn't reachable, attempting curl"
-			curl -o $BLOCKLAND_FILES_FILENAME $BLOCKLAND_FILES_URL
-		fi
+			if which wget; then
+				echo "wget is reachable, using it"
+				wget $BLOCKLAND_FILES_DL_URL
+			else
+				echo "wget isn't reachable, attempting curl"
+				curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
+			fi
 
-		if [ ! -e $BLOCKLAND_FILES_FILENAME ]; then
-			echo "Failed to download server files, aborting."
-			exit 1
+			if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
+				echo "Failed to download server files, aborting."
+				exit 1
+			fi
 		fi
+		unzip $BLOCKLAND_FILES_DL_FILENAME
+	else
+		unzip "$USE_FILE_FOR_BL_DATA" -d $INSTALL_DIR
 	fi
-	unzip $BLOCKLAND_FILES_FILENAME
 
 	echo "Installation complete! Navigate to $INSTALL_DIR and use './runblsrv.sh -g Freebuild' to run a Freebuild server!"
 	exit 0
 }
 
 OPTIND=1
-while getopts "i:g:an:lzh" opt; do
+while getopts "f:i:g:an:lzh" opt; do
 	case "$opt" in
-	i)	install_deps "$OPTARG"
-		exit 1
+	f)	USE_FILE_FOR_BL_DATA=$(realpath "$OPTARG")
+		;;
+	i)	INSTALLING=true
+		INSTALL_TO=$(realpath "$OPTARG")
 		;;
 	a)	ATTACH=true
 		;;
@@ -166,21 +248,30 @@ while getopts "i:g:an:lzh" opt; do
 		ATTACH=false
 		;;
 	h|?) echo "Blockland Dedicated Server Script"
-		echo "version 1.2.1 -- October 10th, 2018 01:12 CDT"
+		echo "version 1.2.2 -- October 10th, 2018 20:08 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo ""
 		echo "Usage: ./runblsrv.sh [options]"
 		echo ""
-		echo "Options:  -a            Automatically attach to the session        [default false]"
-		echo "          -g [gamemode] Specify a gamemode"
-		echo "          -n [name]     Set a custom name for the screen session"
-		echo "          -l            Run a LAN server                           [default false]"
-		echo "          -z            Don't attach to a seperate session         [default false]"
-		echo "          -i [dir]      Install dependencies"
+		echo "Launcher Options:"
+		echo "    -a             Automatically attach to the session        [default false]"
+		echo "    -g [gamemode]  Specify a gamemode"
+		echo "    -n [name]      Set a custom name for the screen session"
+		echo "    -l             Run a LAN server                           [default false]"
+		echo "    -z             Don't attach to a seperate session         [default false]"
+		echo "Installation Options:"
+		echo "    -i [dir]      Install dependencies"
+		echo "    -f [file]     Override downloading game data and use a local file instead"
 		exit 1
 		;;
 	esac
 done
+
+if $INSTALLING; then
+	install_deps "$INSTALL_TO"
+	exit 1
+fi
+
 shift $((OPTIND-1))
 [ "$1" = "--" ] && shift
 
