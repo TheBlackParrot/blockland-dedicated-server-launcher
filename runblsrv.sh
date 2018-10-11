@@ -248,7 +248,7 @@ while getopts "f:i:g:an:lzh" opt; do
 		ATTACH=false
 		;;
 	h|?) echo "Blockland Dedicated Server Script"
-		echo "version 1.2.2 -- October 10th, 2018 01:12 CDT"
+		echo "version 1.2.2 -- October 10th, 2018 20:08 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo ""
 		echo "Usage: ./runblsrv.sh [options]"
