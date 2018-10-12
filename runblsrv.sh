@@ -79,6 +79,10 @@ install_deps() {
 		if [ ! -e /etc/yum.repos.d/winehq.repo ]; then
 			echo ""
 			read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+			
+			if [ $VERSION_ID -eq 29 ]; then
+				VERSION_ID=28
+			fi
 			sudo dnf --assumeyes config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/$VERSION_ID/winehq.repo
 		else
 			echo "WineHQ repository already enabled."
@@ -96,7 +100,11 @@ install_deps() {
 
 				sudo dpkg --add-architecture i386
 
-				curl -o /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				if which wget; then
+					wget -O /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				else
+					curl -o /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				fi
 				sudo apt-key add /tmp/Release.key
 				rm /tmp/Release.key
 
@@ -107,6 +115,43 @@ install_deps() {
 
 		*)
 			echo "This version of Ubuntu is not supported."
+			;;
+		esac
+		;;
+
+	debian)
+		echo ""
+		case "$VERSION_ID" in
+		7|8|9)
+			if grep "^deb https://dl.winehq.org/wine-builds/debian" /etc/apt/sources.list; then
+				echo "WineHQ repository already enabled"
+			else
+				read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+
+				sudo dpkg --add-architecture i386
+
+				if which wget; then
+					wget -O /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				else
+					curl -o /tmp/Release.key https://dl.winehq.org/wine-builds/Release.key
+				fi
+				sudo apt-key add /tmp/Release.key
+				rm /tmp/Release.key
+
+				codename=$(lsb_release -cs)
+				echo "deb https://dl.winehq.org/wine-builds/debian $codename main" | sudo tee -a /etc/apt/sources.list
+			fi
+
+			if dpkg -l apt-transport-https > /dev/null; then
+				echo "apt-transport-https installed"
+			else
+				sudo apt-get -y install apt-transport-https
+			fi
+			sudo apt-get update
+			;;
+
+		*)
+			echo "This version of Debian is not supported."
 			;;
 		esac
 		;;
@@ -163,9 +208,9 @@ install_deps() {
 		fi
 		;;
 
-	ubuntu)
+	ubuntu|debian)
 		case "$VERSION_ID" in
-		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
+		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04|7|8|9)
 			packages=("screen" "unzip" "winehq-devel" "xvfb")
 			for package in ${packages[@]}; do
 				echo "checking for installation of $package..."
@@ -189,7 +234,7 @@ install_deps() {
 			;;
 
 		*)
-			echo "This version of Ubuntu is not supported."
+			echo "This version of Ubuntu or Debian is not supported."
 			;;
 		esac
 		;;
@@ -247,21 +292,23 @@ while getopts "f:i:g:an:lzh" opt; do
 	z)	NO_SCREEN=true
 		ATTACH=false
 		;;
-	h|?) echo "Blockland Dedicated Server Script"
-		echo "version 1.2.2 -- October 10th, 2018 20:08 CDT"
+	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
+		echo "version 1.2.3 -- October 12th, 2018 18:30 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
+		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
 		echo "Usage: ./runblsrv.sh [options]"
 		echo ""
 		echo "Launcher Options:"
-		echo "    -a             Automatically attach to the session        [default false]"
+		echo "    -a             Automatically attach to the session"
 		echo "    -g [gamemode]  Specify a gamemode"
 		echo "    -n [name]      Set a custom name for the screen session"
-		echo "    -l             Run a LAN server                           [default false]"
-		echo "    -z             Don't attach to a seperate session         [default false]"
+		echo "    -l             Run a LAN server"
+		echo "    -z             Don't attach to a screen session"
 		echo "Installation Options:"
-		echo "    -i [dir]      Install dependencies"
-		echo "    -f [file]     Override downloading game data and use a local file instead"
+		echo "    -i [dir]       Install dependencies"
+		echo "    -f [file]      Override downloading game data and use a local file instead"
+		echo "    -q             Bypass all interactive prompts"
 		exit 1
 		;;
 	esac
