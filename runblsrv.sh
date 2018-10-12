@@ -79,6 +79,10 @@ install_deps() {
 		if [ ! -e /etc/yum.repos.d/winehq.repo ]; then
 			echo ""
 			read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+			
+			if [ $VERSION_ID -eq 29 ]; then
+				VERSION_ID=28
+			fi
 			sudo dnf --assumeyes config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/$VERSION_ID/winehq.repo
 		else
 			echo "WineHQ repository already enabled."
@@ -289,7 +293,7 @@ while getopts "f:i:g:an:lzh" opt; do
 		ATTACH=false
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
-		echo "version 1.2.3 -- October 10th, 2018 20:08 CDT"
+		echo "version 1.2.3 -- October 12th, 2018 18:30 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
