@@ -347,7 +347,7 @@ while getopts "d:qf:i:g:an:lzh" opt; do
 		INSTALL_AS_VERSION=$(echo "$OPTARG" | cut -d, -f2)
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
-		echo "version 1.3.0 -- October 12th, 2018 18:30 CDT"
+		echo "version 1.3.0 -- October 12th, 2018 22:19 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
