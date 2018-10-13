@@ -255,6 +255,34 @@ install_packages_ubuntu() {
 	esac
 }
 
+install_packages_fbsd() {
+	if [ $VERSION_ID != "11.2" ]; then
+		echo "Only FreeBSD 11.2 is currently supported."
+		exit 1
+	fi
+
+	packages=("screen" "unzip" "i386-wine-devel" "xorg-vfbserver" "xauth")
+
+	for package in ${packages[@]}; do
+		echo "checking for installation of $package..."	
+		if pkg info $package > /dev/null; then
+			echo "already installed $package !"
+		else
+			echo "need to install $package !"
+			packagesinst+=("$package")			
+		fi
+	done
+
+	if [ ${#packagesinst[@]} -gt 0 ]; then
+		echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
+		echo -e "${packagesinst[@]}\n"
+		qread ""
+		sudo pkg install -y ${packagesinst[@]}
+	else
+		echo -e "\nRequired packages already installed.\n"
+	fi
+}
+
 install_deps() {
 	motd
 
@@ -262,7 +290,14 @@ install_deps() {
 	sudo_check
 
 	# grab distribution information
-	source /etc/os-release
+	if [ $(uname) == "FreeBSD" ]; then
+		NAME="FreeBSD"
+		VERSION=$(uname -r)
+		VERSION_ID=$(echo $VERSION | cut -d- -f1)
+		ID="fbsd"
+	else
+		source /etc/os-release
+	fi
 	echo -e "Detected distro $NAME $VERSION (internally: $ID)\n"
 
 	if [ ! -z "$INSTALL_AS_ID" ]; then
@@ -297,6 +332,7 @@ install_deps() {
 		fedora) enable_repo_fedora ;;
 		ubuntu) enable_repo_ubuntu ;;
 		debian) enable_repo_debian ;;
+		fbsd) ;;
 		*)
 			echo "Unknown distro $ID version $VERSION"
 			exit 1
@@ -309,6 +345,7 @@ install_deps() {
 		arch) install_packages_arch ;;
 		fedora) install_packages_fedora ;;
 		ubuntu|debian) install_packages_ubuntu ;;
+		fbsd) install_packages_fbsd ;;
 		*)
 			echo "Unknown distro $ID version $VERSION"
 			exit 1
@@ -347,7 +384,7 @@ while getopts "d:qf:i:g:an:lzh" opt; do
 		INSTALL_AS_VERSION=$(echo "$OPTARG" | cut -d, -f2)
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
-		echo "version 1.3.0 -- October 12th, 2018 22:19 CDT"
+		echo "version 1.3.1 -- October 12th, 2018 22:19 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
@@ -410,11 +447,48 @@ if [ $(screen -list | grep -c "$SERVER_NAME") -gt 0 ]; then
 fi
 
 
-if [ $NO_SCREEN = false ]; then
-	screen -dmS \
-		"$SERVER_NAME" \
+if [ $(uname) == "FreeBSD" ]; then
+	if $(ps aux | grep "Xvfb :9"); then
+		echo "X server display 9 already running"
+	else
+		Xvfb :9 -screen 0 800x600x16 &
+	fi
+
+	export DISPLAY=:9
+
+	if [ $NO_SCREEN = false ]; then
+		screen -dmS \
+			"$SERVER_NAME" \
+				wine wineconsole \
+					--backend=curses \
+					"$SERVER_PATH/Blockland.exe" \
+					ptlaaxobimwroe \
+					$DEDICATED_MODE \
+					-gamemode "$GAMEMODE"
+	else
+		wine wineconsole \
+			--backend=curses \
+			"$SERVER_PATH/Blockland.exe" \
+			ptlaaxobimwroe \
+			$DEDICATED_MODE \
+			-gamemode "$GAMEMODE"
+	fi
+else
+	if [ $NO_SCREEN = false ]; then
+		screen -dmS \
+			"$SERVER_NAME" \
+			xvfb-run -a \
+				-n 103 \
+				-e /dev/stdout \
+				wine wineconsole \
+					--backend=curses \
+					"$SERVER_PATH/Blockland.exe" \
+					ptlaaxobimwroe \
+					$DEDICATED_MODE \
+					-gamemode "$GAMEMODE"
+	else
 		xvfb-run -a \
-			-n 103 \
+			-n 100 \
 			-e /dev/stdout \
 			wine wineconsole \
 				--backend=curses \
@@ -422,16 +496,7 @@ if [ $NO_SCREEN = false ]; then
 				ptlaaxobimwroe \
 				$DEDICATED_MODE \
 				-gamemode "$GAMEMODE"
-else
-	xvfb-run -a \
-		-n 100 \
-		-e /dev/stdout \
-		wine wineconsole \
-			--backend=curses \
-			"$SERVER_PATH/Blockland.exe" \
-			ptlaaxobimwroe \
-			$DEDICATED_MODE \
-			-gamemode "$GAMEMODE"
+	fi
 fi
 
 if [ $NO_SCREEN = false ]; then
