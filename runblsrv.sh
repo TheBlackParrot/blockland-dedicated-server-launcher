@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 NO_SCREEN=false
 ATTACH=false
@@ -384,7 +384,7 @@ while getopts "d:qf:i:g:an:lzh" opt; do
 		INSTALL_AS_VERSION=$(echo "$OPTARG" | cut -d, -f2)
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
-		echo "version 1.3.1 -- October 12th, 2018 22:19 CDT"
+		echo "version 1.3.1 -- October 13th, 2018 01:36 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
@@ -448,7 +448,7 @@ fi
 
 
 if [ $(uname) == "FreeBSD" ]; then
-	if $(ps aux | grep "Xvfb :9"); then
+	if ps aux | grep "Xvfb :9" > /dev/null; then
 		echo "X server display 9 already running"
 	else
 		Xvfb :9 -screen 0 800x600x16 &
