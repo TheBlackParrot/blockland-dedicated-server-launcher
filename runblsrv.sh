@@ -343,7 +343,7 @@ while getopts "d:qf:i:g:an:lzh" opt; do
 		;;
 	q)	BE_QUIET=true
 		;;
-	s)	INSTALL_AS_ID=$(echo "$OPTARG" | cut -d, -f1)
+	d)	INSTALL_AS_ID=$(echo "$OPTARG" | cut -d, -f1)
 		INSTALL_AS_VERSION=$(echo "$OPTARG" | cut -d, -f2)
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
