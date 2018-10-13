@@ -265,6 +265,16 @@ install_deps() {
 	source /etc/os-release
 	echo -e "Detected distro $NAME $VERSION (internally: $ID)\n"
 
+	if [ ! -z "$INSTALL_AS_ID" ]; then
+		ID=$INSTALL_AS_ID
+		echo "forcing install as $ID"
+	fi
+
+	if [ ! -z "$INSTALL_AS_VERSION" ]; then
+		VERSION=$INSTALL_AS_VERSION
+		echo "with distro version $VERSION"
+	fi
+
 	# create the installation directory if it doesn't exist and enter it
 	if [ -z "$1" ]; then
 		INSTALL_DIR="$PWD/blockland"
@@ -313,7 +323,7 @@ install_deps() {
 }
 
 OPTIND=1
-while getopts "qf:i:g:an:lzh" opt; do
+while getopts "d:qf:i:g:an:lzh" opt; do
 	case "$opt" in
 	f)	USE_FILE_FOR_BL_DATA=$(realpath "$OPTARG")
 		;;
@@ -333,6 +343,9 @@ while getopts "qf:i:g:an:lzh" opt; do
 		;;
 	q)	BE_QUIET=true
 		;;
+	s)	INSTALL_AS_ID=$(echo "$OPTARG" | cut -d, -f1)
+		INSTALL_AS_VERSION=$(echo "$OPTARG" | cut -d, -f2)
+		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
 		echo "version 1.3.0 -- October 12th, 2018 18:30 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
@@ -350,6 +363,7 @@ while getopts "qf:i:g:an:lzh" opt; do
 		echo "    -i [dir]       Install dependencies"
 		echo "    -f [file]      Override downloading game data and use a local file instead"
 		echo "    -q             Bypass all interactive prompts"
+		echo "    -d [distro,v]  Force the installer to use a different Linux distro"
 		exit 1
 		;;
 	esac
