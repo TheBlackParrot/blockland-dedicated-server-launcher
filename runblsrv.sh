@@ -7,6 +7,7 @@ export WINEDLLOVERRIDES="mscoree=d;mshtml=d;$WINEDLLOVERRIDES"
 DEDICATED_MODE="-dedicated"
 
 INSTALLING=false
+BE_QUIET=false
 
 BLOCKLAND_FILES_DL_FILENAME="BLr1988-server.zip"
 BLOCKLAND_FILES_DL_URL="https://birb.zone/files/$BLOCKLAND_FILES_DL_FILENAME"
@@ -15,6 +16,14 @@ if [ $(id -u) -eq 0 ]; then
 	echo "This script cannot be run as root"
 	exit 1
 fi
+
+qread() {
+	if $BE_QUIET; then
+		echo "$*"
+	else
+		read -n 1 -s -r -p "$*"
+	fi
+}
 
 motd() {
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -54,7 +63,7 @@ gather_and_unpack_blockland() {
 	if [ -z "$USE_FILE_FOR_BL_DATA" ]; then
 		echo "not using an overriding local file"
 		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
-			read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
+			qread "Blockland must now be downloaded, press any key to continue."
 
 			if which wget; then
 				echo "wget is reachable, using it"
@@ -83,7 +92,7 @@ enable_repo_arch() {
 	if grep -Fx "[multilib]" /etc/pacman.conf; then
 		echo "Multilib repository already enabled."
 	else
-		read -n 1 -s -r -p "The multilib repository needs to be enabled, press any key to continue."
+		qread "The multilib repository needs to be enabled, press any key to continue."
 		echo -e "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist" | sudo tee -a /etc/pacman.conf > /dev/null
 	fi
 
@@ -92,7 +101,7 @@ enable_repo_arch() {
 
 enable_repo_fedora() {
 	if [ ! -e /etc/yum.repos.d/winehq.repo ]; then
-		read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+		qread "The WineHQ repository needs to be enabled, press any key to continue."
 
 		if [ $VERSION_ID -eq 29 ]; then
 			VERSION_ID=28
@@ -109,7 +118,7 @@ enable_repo_ubuntu() {
 			if grep "^deb https://dl.winehq.org/wine-builds/ubuntu" /etc/apt/sources.list; then
 				echo "WineHQ repository already enabled"
 			else
-				read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+				qread "The WineHQ repository needs to be enabled, press any key to continue."
 
 				sudo dpkg --add-architecture i386
 
@@ -139,7 +148,7 @@ enable_repo_debian() {
 			if grep "^deb https://dl.winehq.org/wine-builds/debian" /etc/apt/sources.list; then
 				echo "WineHQ repository already enabled"
 			else
-				read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+				qread "The WineHQ repository needs to be enabled, press any key to continue."
 
 				sudo dpkg --add-architecture i386
 
@@ -186,7 +195,7 @@ install_packages_arch() {
 	if [ ${#packagesinst[@]} -gt 0 ]; then
 		echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
 		echo -e "${packagesinst[@]}\n"
-		read -n 1 -s -r -p ""
+		qread ""
 		yes | sudo pacman --noconfirm -S ${packagesinst[@]}
 	else
 		echo -e "\nRequired packages already installed."
@@ -207,7 +216,7 @@ install_packages_fedora() {
 	if [ ${#packagesinst[@]} -gt 0 ]; then
 		echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
 		echo -e "${packagesinst[@]}\n"
-		read -n 1 -s -r -p ""
+		qread ""
 		sudo dnf --assumeyes install ${packagesinst[@]}
 	else
 		echo -e "\nRequired packages already installed."
@@ -232,7 +241,7 @@ install_packages_ubuntu() {
 			if [ ${#packagesinst[@]} -gt 0 ]; then
 				echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
 				echo -e "${packagesinst[@]}\n"
-				read -n 1 -s -r -p ""
+				qread ""
 				sudo apt-get -y install ${packagesinst[@]}
 			else
 				echo -e "\nRequired packages already installed.\n"
@@ -304,7 +313,7 @@ install_deps() {
 }
 
 OPTIND=1
-while getopts "f:i:g:an:lzh" opt; do
+while getopts "qf:i:g:an:lzh" opt; do
 	case "$opt" in
 	f)	USE_FILE_FOR_BL_DATA=$(realpath "$OPTARG")
 		;;
@@ -321,6 +330,8 @@ while getopts "f:i:g:an:lzh" opt; do
 		;;
 	z)	NO_SCREEN=true
 		ATTACH=false
+		;;
+	q)	BE_QUIET=true
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
 		echo "version 1.3.0 -- October 12th, 2018 18:30 CDT"
