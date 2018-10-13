@@ -16,30 +16,30 @@ if [ $(id -u) -eq 0 ]; then
 	exit 1
 fi
 
-install_deps() {
+motd() {
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo "!!!!! THIS SCRIPT IS NOT GUARANTEED TO WORK FOR YOUR SYSTEM !!!!!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "If it fails, please send the output of 'cat /etc/os-release' to TheBlackParrot#1352 on Discord."
+	echo -e "If it fails, please send the output of 'cat /etc/os-release' to TheBlackParrot#1352 on Discord.\n"	
+}
 
-	# requires sudo for some functionality
+sudo_check() {
 	if [ ! -x $(which sudo) ]; then
-		echo "Please install sudo."
+		echo -e "Please install sudo.\n"
 		exit 1
+	fi	
+}
+
+override_check() {
+	if [ ! -z "$USE_FILE_FOR_BL_DATA" ]; then
+		if [ ! -e "$USE_FILE_FOR_BL_DATA" ]; then
+			echo "Cannot access $USE_FILE_FOR_BL_DATA, please check permissions and/or if the file exists."
+			exit 1
+		fi
 	fi
+}
 
-	# grab distribution information
-	source /etc/os-release
-	echo "Detected distro $NAME $VERSION (internally: $ID)"
-	echo ""
-
-	# create the installation directory if it doesn't exist and enter it
-	if [ -z "$1" ]; then
-		INSTALL_DIR="$PWD/blockland"
-	else
-		INSTALL_DIR="$1"
-	fi
-
+create_install_dir() {
 	if [ ! -d "$INSTALL_DIR" ]; then
 		if mkdir "$INSTALL_DIR"; then
 			echo "Created directory $INSTALL_DIR"
@@ -48,50 +48,59 @@ install_deps() {
 			exit 1
 		fi
 	fi
+}
 
-	if [ ! -z "$USE_FILE_FOR_BL_DATA" ]; then
-		if [ ! -e "$USE_FILE_FOR_BL_DATA" ]; then
-			echo "Cannot access $USE_FILE_FOR_BL_DATA, please check permissions and/or if the file exists."
-			exit 1
+gather_and_unpack_blockland() {
+	if [ -z "$USE_FILE_FOR_BL_DATA" ]; then
+		echo "not using an overriding local file"
+		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
+			read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
+
+			if which wget; then
+				echo "wget is reachable, using it"
+				wget $BLOCKLAND_FILES_DL_URL
+			else
+				echo "wget isn't reachable, attempting curl"
+				curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
+			fi
+
+			if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
+				echo "Failed to download server files, aborting."
+				exit 1
+			fi
 		fi
+		unzip $BLOCKLAND_FILES_DL_FILENAME
+	else
+		unzip "$USE_FILE_FOR_BL_DATA" -d $INSTALL_DIR
+	fi
+}
+
+enable_repo_arch() {
+	if grep -Fx "[multilib]" /etc/pacman.conf; then
+		echo "Multilib repository already enabled."
+	else
+		read -n 1 -s -r -p "The multilib repository needs to be enabled, press any key to continue."
+		echo -e "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist" | sudo tee -a /etc/pacman.conf > /dev/null
 	fi
 
-	cp "$0" "$INSTALL_DIR"
-	cd "$INSTALL_DIR"
-	chmod +x "$0"
-	echo "using $INSTALL_DIR as the installation directory"
+	yes | sudo pacman --noconfirm -Syy	
+}
 
-	# enable repositories
-	case "$ID" in
-	arch)
-		echo ""
-		if grep -Fx "[multilib]" /etc/pacman.conf; then
-			echo "Multilib repository already enabled."
-		else
-			read -n 1 -s -r -p "The multilib repository needs to be enabled, press any key to continue."
-			echo -e "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist" | sudo tee -a /etc/pacman.conf > /dev/null
+enable_repo_fedora() {
+	if [ ! -e /etc/yum.repos.d/winehq.repo ]; then
+		read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
+
+		if [ $VERSION_ID -eq 29 ]; then
+			VERSION_ID=28
 		fi
+		sudo dnf --assumeyes config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/$VERSION_ID/winehq.repo
+	else
+		echo "WineHQ repository already enabled."
+	fi
+}
 
-		yes | sudo pacman --noconfirm -Syy
-		;;
-
-	fedora)
-		if [ ! -e /etc/yum.repos.d/winehq.repo ]; then
-			echo ""
-			read -n 1 -s -r -p "The WineHQ repository needs to be enabled, press any key to continue."
-			
-			if [ $VERSION_ID -eq 29 ]; then
-				VERSION_ID=28
-			fi
-			sudo dnf --assumeyes config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/$VERSION_ID/winehq.repo
-		else
-			echo "WineHQ repository already enabled."
-		fi
-		;;
-
-	ubuntu)
-		echo ""
-		case "$VERSION_ID" in
+enable_repo_ubuntu() {
+	case "$VERSION_ID" in
 		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04)
 			if grep "^deb https://dl.winehq.org/wine-builds/ubuntu" /etc/apt/sources.list; then
 				echo "WineHQ repository already enabled"
@@ -116,12 +125,11 @@ install_deps() {
 		*)
 			echo "This version of Ubuntu is not supported."
 			;;
-		esac
-		;;
+	esac
+}
 
-	debian)
-		echo ""
-		case "$VERSION_ID" in
+enable_repo_debian() {
+	case "$VERSION_ID" in
 		7|8|9)
 			if grep "^deb https://dl.winehq.org/wine-builds/debian" /etc/apt/sources.list; then
 				echo "WineHQ repository already enabled"
@@ -153,65 +161,58 @@ install_deps() {
 		*)
 			echo "This version of Debian is not supported."
 			;;
-		esac
-		;;
-
-	*)
-		echo "Unknown distro $ID version $VERSION"
-		;;
 	esac
+}
 
-	# install required packages
-	packagesinst=()
-	case "$ID" in
-	arch)
-		packages=("screen" "unzip" "wine" "xorg-server-xvfb")
-		for package in ${packages[@]}; do
-			echo "checking for installation of $package..."
-			if pacman -Qi $package > /dev/null; then
-				echo "already installed $package !"
-			else
-				echo "need to install $package !"
-				packagesinst+=("$package")
-			fi
-		done
+install_packages_arch() {
+	packages=("screen" "unzip" "wine" "xorg-server-xvfb")
 
-		if [ ${#packagesinst[@]} -gt 0 ]; then
-			echo ""
-			echo "The following packages and their dependencies will be installed: (press any key to continue)"
-			echo "${packagesinst[@]}"
-			read -n 1 -s -r -p ""
-			yes | sudo pacman --noconfirm -S ${packagesinst[@]}
+	for package in ${packages[@]}; do
+		echo "checking for installation of $package..."
+		if pacman -Qi $package > /dev/null; then
+			echo "already installed $package !"
 		else
-			echo "Required packages already installed."
+			echo "need to install $package !"
+			packagesinst+=("$package")
 		fi
-		;;
+	done
 
-	fedora)
-		packages=("screen" "unzip" "winehq-devel" "xorg-x11-server-Xvfb")
-		for package in ${packages[@]}; do
-			echo "checking for installation of $package..."
-			if [ $(rpm -qa $package | wc -l) == 0 ]; then
-				echo "need to install $package !"
-				packagesinst+=("$package")
-			fi
-		done
+	if [ ${#packagesinst[@]} -gt 0 ]; then
+		echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
+		echo -e "${packagesinst[@]}\n"
+		read -n 1 -s -r -p ""
+		yes | sudo pacman --noconfirm -S ${packagesinst[@]}
+	else
+		echo -e "\nRequired packages already installed."
+	fi
+}
 
-		if [ ${#packagesinst[@]} -gt 0 ]; then
-			echo ""
-			echo "The following packages and their dependencies will be installed: (press any key to continue)"
-			echo "${packagesinst[@]}"
-			read -n 1 -s -r -p ""
-			sudo dnf --assumeyes install ${packagesinst[@]}
-		else
-			echo "Required packages already installed."
+install_packages_fedora() {
+	packages=("screen" "unzip" "winehq-devel" "xorg-x11-server-Xvfb")
+
+	for package in ${packages[@]}; do
+		echo "checking for installation of $package..."
+		if [ $(rpm -qa $package | wc -l) == 0 ]; then
+			echo "need to install $package !"
+			packagesinst+=("$package")
 		fi
-		;;
+	done
 
-	ubuntu|debian)
-		case "$VERSION_ID" in
+	if [ ${#packagesinst[@]} -gt 0 ]; then
+		echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
+		echo -e "${packagesinst[@]}\n"
+		read -n 1 -s -r -p ""
+		sudo dnf --assumeyes install ${packagesinst[@]}
+	else
+		echo -e "\nRequired packages already installed."
+	fi
+}
+
+install_packages_ubuntu() {
+	case "$VERSION_ID" in
 		14.04|14.10|15.04|15.10|16.04|16.10|17.04|17.10|18.04|7|8|9)
 			packages=("screen" "unzip" "winehq-devel" "xvfb")
+
 			for package in ${packages[@]}; do
 				echo "checking for installation of $package..."
 				if dpkg -l $package > /dev/null; then
@@ -223,53 +224,75 @@ install_deps() {
 			done
 
 			if [ ${#packagesinst[@]} -gt 0 ]; then
-				echo ""
-				echo "The following packages and their dependencies will be installed: (press any key to continue)"
-				echo "${packagesinst[@]}"
+				echo -e "\nThe following packages and their dependencies will be installed: (press any key to continue)"
+				echo -e "${packagesinst[@]}\n"
 				read -n 1 -s -r -p ""
 				sudo apt-get -y install ${packagesinst[@]}
 			else
-				echo "Required packages already installed."
+				echo -e "\nRequired packages already installed.\n"
 			fi
 			;;
 
 		*)
 			echo "This version of Ubuntu or Debian is not supported."
 			;;
-		esac
-		;;
+	esac
+}
 
-	*)
-		echo "Unknown distro $ID version $VERSION"
-		;;
+install_deps() {
+	motd
+
+	# requires sudo for some functionality
+	sudo_check
+
+	# grab distribution information
+	source /etc/os-release
+	echo -e "Detected distro $NAME $VERSION (internally: $ID)\n"
+
+	# create the installation directory if it doesn't exist and enter it
+	if [ -z "$1" ]; then
+		INSTALL_DIR="$PWD/blockland"
+	else
+		INSTALL_DIR="$1"
+	fi
+
+	create_install_dir
+
+	override_check
+
+	cp "$0" "$INSTALL_DIR"
+	cd "$INSTALL_DIR"
+	chmod +x "$0"
+	echo -e "using $INSTALL_DIR as the installation directory\n"
+
+	# enable repositories
+	case "$ID" in
+		arch) enable_repo_arch ;;
+		fedora) enable_repo_fedora ;;
+		ubuntu) enable_repo_ubuntu ;;
+		debian) enable_repo_debian ;;
+		*)
+			echo "Unknown distro $ID version $VERSION"
+			exit 1
+			;;
+	esac
+
+	# install required packages
+	packagesinst=()
+	case "$ID" in
+		arch) install_packages_arch ;;
+		fedora) install_packages_fedora ;;
+		ubuntu|debian) install_packages_ubuntu ;;
+		*)
+			echo "Unknown distro $ID version $VERSION"
+			exit 1
+			;;
 	esac
 
 	# download Blockland itself
-	if [ -z "$USE_FILE_FOR_BL_DATA" ]; then
-		echo "not using an overriding local file"
-		if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
-			echo ""
-			read -n 1 -s -r -p "Blockland must now be downloaded, press any key to continue."
+	gather_and_unpack_blockland
 
-			if which wget; then
-				echo "wget is reachable, using it"
-				wget $BLOCKLAND_FILES_DL_URL
-			else
-				echo "wget isn't reachable, attempting curl"
-				curl -o $BLOCKLAND_FILES_DL_FILENAME $BLOCKLAND_FILES_DL_URL
-			fi
-
-			if [ ! -e $BLOCKLAND_FILES_DL_FILENAME ]; then
-				echo "Failed to download server files, aborting."
-				exit 1
-			fi
-		fi
-		unzip $BLOCKLAND_FILES_DL_FILENAME
-	else
-		unzip "$USE_FILE_FOR_BL_DATA" -d $INSTALL_DIR
-	fi
-
-	echo "Installation complete! Navigate to $INSTALL_DIR and use './runblsrv.sh -g Freebuild' to run a Freebuild server!"
+	echo -e "\nInstallation complete! Navigate to $INSTALL_DIR and use './runblsrv.sh -g Freebuild' to run a Freebuild server!"
 	exit 0
 }
 
@@ -293,7 +316,7 @@ while getopts "f:i:g:an:lzh" opt; do
 		ATTACH=false
 		;;
 	h|?) echo "---===<| Blockland Dedicated Server Script |>===---"
-		echo "version 1.2.3 -- October 12th, 2018 18:30 CDT"
+		echo "version 1.3.0 -- October 12th, 2018 18:30 CDT"
 		echo "TheBlackParrot (BL_ID 18701)"
 		echo "https://github.com/TheBlackParrot/blockland-dedicated-server-launcher"
 		echo ""
