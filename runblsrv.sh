@@ -73,6 +73,10 @@ gather_and_unpack_blockland() {
 	else
 		unzip "$USE_FILE_FOR_BL_DATA" -d $INSTALL_DIR
 	fi
+
+	if [ ! -e "$INSTALL_DIR/Blockland.exe" ]; then
+		echo "Blockland.exe not present in install directory! (Tried to install to $INSTALL_DIR)"
+	fi
 }
 
 enable_repo_arch() {
@@ -124,6 +128,7 @@ enable_repo_ubuntu() {
 
 		*)
 			echo "This version of Ubuntu is not supported."
+			exit 1
 			;;
 	esac
 }
@@ -160,6 +165,7 @@ enable_repo_debian() {
 
 		*)
 			echo "This version of Debian is not supported."
+			exit 1
 			;;
 	esac
 }
@@ -235,6 +241,7 @@ install_packages_ubuntu() {
 
 		*)
 			echo "This version of Ubuntu or Debian is not supported."
+			exit 1
 			;;
 	esac
 }
